@@ -1,5 +1,5 @@
 # Version des Skripts
-$ScriptVersion = "1.0.3"
+$ScriptVersion = "1.0.1"
 
 # Ausführungsdatum
 $ExecutionDate = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
@@ -9,13 +9,13 @@ function Show-Banner {
     $Banner = @"
 *******************************************************
 *                                                     *
-*       Willkommen zum Support-Info-Skript!           *
+*               Support-Info-Script!                  *
 *                                                     *
 *   Version: $ScriptVersion                           *
-*   Datum: $ExecutionDate                       	    *
+*   Date: $ExecutionDate                           	  *
 *                                                     *
-*   Bitte senden sie folgende Datei                   *
-*   Ihrem IT-Support                                  *
+*   Please send the following file                    *
+*   to your IT support.                               *
 *                                                     *
 *   /Desktop/SupportInfo.txt                          *
 *                                                     *
@@ -24,103 +24,103 @@ function Show-Banner {
     Write-Host $Banner -ForegroundColor Cyan
 }
 
-# Banner anzeigen
+# Show Banner
 Show-Banner
 
-# Benutzerinformationen erfassen
+# Collect Userinformation
 $UserName = $env:USERNAME
 $ComputerName = $env:COMPUTERNAME
 
-# IP-Adresse(n) erfassen
-$IPAddresses = (Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.IPAddress -notmatch "^(1\\.0\\.1)$" }).IPAddress -join ", "
+# Collect IP address(es)
+$IPAddresses = (Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.IPAddress -notmatch "^(127\\.0\\.1)$" }).IPAddress -join ", "
 
-# Kerberos-Tickets abrufen
+# Get Kerberos-Tickets
 try {
     $KlistOutput = klist | Out-String
 } catch {
-    $KlistOutput = "Fehler beim Abrufen der Kerberos-Tickets: $_"
+    $KlistOutput = "Error retrieving Kerberos tickets: $_"
 }
 
-# Laufwerke erfassen
+# Get Storages
 $Drives = Get-PSDrive -PSProvider FileSystem | Where-Object { $_.Used -ne $null }
 $DrivesInfo = if ($Drives) {
     $Drives | ForEach-Object {
-        $UNCPath = if ($_.DisplayRoot -ne $null) { $_.DisplayRoot } elseif ($_.Root -match "^\\\\") { $_.Root } else { "Lokales Laufwerk" }
-        "$($_.Name): $UNCPath; Freier Speicherplatz: $([math]::Round($_.Free / 1GB, 2)) GB; Belegter Speicherplatz: $([math]::Round($_.Used / 1GB, 2)) GB; Gesamt Speicherplatz: $([math]::Round(($_.Used + $_.Free) / 1GB, 2)) GB"
+        $UNCPath = if ($_.DisplayRoot -ne $null) { $_.DisplayRoot } elseif ($_.Root -match "^\\\\") { $_.Root } else { "Local storage" }
+        "$($_.Name): $UNCPath; Free Space: $([math]::Round($_.Free / 1GB, 2)) GB; Used Space: $([math]::Round($_.Used / 1GB, 2)) GB; Total storage space: $([math]::Round(($_.Used + $_.Free) / 1GB, 2)) GB"
     } | Out-String
 } else {
-    "Keine Laufwerke gefunden."
+    "No drives found."
 }
 
-# Hardware-Informationen sammeln
+# Hardware-Information
 $CPU = (Get-CimInstance -ClassName Win32_Processor).Name -join ", "
 $RAM = [math]::Round((Get-CimInstance -ClassName Win32_ComputerSystem).TotalPhysicalMemory / 1GB, 2)
 $GPU = (Get-CimInstance -ClassName Win32_VideoController).Name -join ", "
 $Mainboard = Get-CimInstance -ClassName Win32_BaseBoard | Select-Object -ExpandProperty Product
 $BIOS = Get-CimInstance -ClassName Win32_BIOS | Select-Object -ExpandProperty SMBIOSBIOSVersion
 
-# Netzwerk- und Systeminformationen
+# Network- and Systeminformation
 $MACAddresses = (Get-NetAdapter | Select-Object -ExpandProperty MacAddress) -join ", "
 $Gateway = (Get-NetIPAddress -AddressFamily IPv4 | Where-Object { $_.DefaultGateway -ne $null }).DefaultGateway -join ", "
 $DNS = (Get-DnsClientServerAddress -AddressFamily IPv4).ServerAddresses -join ", "
 $VPNConnections = (Get-VpnConnection | Select-Object -ExpandProperty Name) -join ", "
 $FirewallStatus = (Get-NetFirewallProfile | ForEach-Object { "$($_.Name): $($_.Enabled)" }) -join ", "
 
-# Software- und Peripheriegeräte
+# Software and peripherals
 $OSVersion = (Get-ComputerInfo | Select-Object -ExpandProperty WindowsVersion)
 $OSBuild = (Get-ComputerInfo | Select-Object -ExpandProperty WindowsBuildLabEx)
 $InstalledSoftware = (Get-ItemProperty HKLM:\Software\Microsoft\Windows\CurrentVersion\Uninstall\* | Select-Object DisplayName, DisplayVersion) | Out-String
 $USBDevices = (Get-PnpDevice | Where-Object { $_.Class -eq 'USB' } | Select-Object -ExpandProperty FriendlyName) -join ", "
-$Monitors = (Get-CimInstance -ClassName Win32_DesktopMonitor | ForEach-Object { "Name: $($_.Name), Auflösung: $($_.ScreenWidth)x$($_.ScreenHeight)" }) -join ", "
+$Monitors = (Get-CimInstance -ClassName Win32_DesktopMonitor | ForEach-Object { "Name: $($_.Name), Resolution: $($_.ScreenWidth)x$($_.ScreenHeight)" }) -join ", "
 
-# Speicherpfad definieren
+# Define storage path
 if ($env:SESSIONNAME -match "^ICA") {
-    $OutputPath = "-"
+    $OutputPath = "PROFILEPATH\DESKTOP\SupportInfo.txt"
 } else {
     $OutputPath = "$env:USERPROFILE\Desktop\SupportInfo.txt"
 }
 
-# Informationen zusammenstellen
+# Compile information
 $SupportInfo = @"
-Ausführungsdatum: $ExecutionDate
-Skriptversion: $ScriptVersion
+Execution Date: $ExecutionDate
+Scriptversion: $ScriptVersion
 
-Benutzername: $UserName
-Rechnername: $ComputerName
-IP-Adressen: $IPAddresses
+Username: $UserName
+Computername: $ComputerName
+IP-Addresses: $IPAddresses
 
 Hardware:
 CPU: $CPU
 RAM: $RAM GB
-Grafikkarte(n): $GPU
+Graphics card(s): $GPU
 Mainboard: $Mainboard
 BIOS-Version: $BIOS
 
 Netzwerk:
-MAC-Adressen: $MACAddresses
+MAC-Addresses: $MACAddresses
 Standardgateway: $Gateway
 DNS-Server: $DNS
-VPN-Verbindungen: $VPNConnections
+VPN-Connection: $VPNConnections
 Firewall-Status: $FirewallStatus
 
 Software:
-Betriebssystem: $OSVersion (Build $OSBuild)
-Installierte Software:
+OS: $OSVersion (Build $OSBuild)
+Installed Software:
 $InstalledSoftware
 
-Peripheriegeräte:
-USB-Geräte: $USBDevices
-Monitore: $Monitors
+Peripherals:
+USB-Devices: $USBDevices
+Monitors: $Monitors
 
 Kerberos-Tickets:
 $KlistOutput
 
-Laufwerke:
+Storage:
 $DrivesInfo
 "@
 
-# Ausgabe in eine Datei speichern
+# Output in file
 $SupportInfo | Set-Content -Path $OutputPath -Encoding UTF8
 
-# Benutzerbenachrichtigung
-Write-Host "Support-Informationen wurden erfolgreich erstellt und gespeichert unter: $OutputPath"
+# Userinformation Notification
+Write-Host "Support information was successfully created and saved under: $OutputPath"
